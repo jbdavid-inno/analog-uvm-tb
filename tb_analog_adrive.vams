@@ -1,0 +1,50 @@
+//Verilog-AMS HDL for "{{library_name}}", "{{name}}_adrive" "verilogams"
+`timescale 1ns/1ps
+`include "constants.vams"
+`include "disciplines.vams"
+// auto generated power top
+module {{ name }}_adrive ( {% set comma=joiner(', ') %}{% for port,portitem in ports.items()  %}{{ comma() }}
+	{{portitem['dir']}} {%if portitem['msb'] %}[{{portitem['msb']}}:{{portitem['lsb']}}]{%else%} 	{%endif%} 	{{port}} {% endfor %}
+);
+// declarations for signals
+{% for port,portitem in ports.items() %}electrical{% if portitem.msb %}  [{{portitem[msb]}}:{{portitem[lsb]}}] {%else%} 	{%endif%} {{port}};
+{% endfor %}
+// variables for the digital context
+reg sample_trigger = 0;
+
+{% for port,portitem in ports.items() %}{%if portitem['dir'] in ['input'] %}{% if portitem.msb %}{%for index in range(portitem[lsb],portitem[msb]+1,1) %} real {{port}}_{{index}}_volts;
+{% endfor %}{%else%} real {{port}}_volts;
+{% endif %}{% endif %}{% endfor %}
+
+always @(posedge sample_trigger) begin
+{% for port,portitem in ports.items() %}{%if portitem['dir'] in ['input'] %}{% if portitem.msb %}{%for index in range(portitem[lsb],portitem[msb]+1,1) %}  {{port}}_{{index}}_volts = V({{port}}[{{index}}]);
+{% endfor %}{%else%} {{port}}_volts = V({{port}});
+{% endif %}{% endif %}{% endfor %}
+end	
+// for the analog context
+// rratio 
+
+//> Isig$freq = 10M;
+//	> Isig$Amp = 1.2;
+//	> Qsig$freq = 10M;
+//	> Qsig$Amp = 1.2;
+//	> tb_clk$en = 1;
+//	> Isig$en = 1;
+//	> Qsig$en = 1;
+//	>  #(`fromSeconds(100n));
+
+
+
+analog begin
+// insert behavior here
+//> Isig$afreq = transition(Isig$freq, 0,1n,1n);
+//> Isig$phase = idtmod(Isig$afreq,0,1);
+//> Isig$a =   cos( `M_TWO_PI * Isig$phase)*transition(Isig$Amp);
+//> if (Isig$en ) $bound_step(0.05/max(Isig$afreq,1000));
+//> Qsig$afreq = transition(Qsig$freq, 0,1n,1n);
+//> Qsig$phase = idtmod(Qsig$afreq,0,1);
+//> Qsig$a =   cos( `M_TWO_PI * (Qsig$phase-0.25))*transition(Qsig$Amp);
+//> if (Qsig$en ) $bound_step(0.05/max(Qsig$afreq,1000));
+end
+
+endmodule

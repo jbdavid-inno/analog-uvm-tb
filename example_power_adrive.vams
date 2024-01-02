@@ -1,0 +1,67 @@
+//Verilog-AMS HDL for "{{library_name}}", "{{name}}_adrive" "verilogams"
+`include "constants.vams"
+`include "disciplines.vams"
+module {{ name }}_adrive ( {% set comma=joiner(', ') %}{% for port,portitem in ports.items()  %}{{ comma() }}
+	{{portitem['dir']}}{% if portitem['msb'] %}[{{portitem['msb']}}:{{portitem['lsb']}}]{% else %} 	
+{%- endif %} 	{{port}} {% endfor %} );
+{% for port,portitem in ports.items() %}electrical{% if portitem.msb %}  [{{portitem['msb']}}:{{portitem['lsb']}}] {%else%} 	{%endif%} {{port}};
+{% endfor %}
+reg sample_trigger = 0; 
+{% for port,portitem in ports.items() %}
+{%- if portitem['dir'] in ['output'] and portitem['supply_type'] in ['volts']%}
+{%- if portitem.msb %}{%for index in range(portitem['lsb']|int,portitem['msb']|int+1,1) %} real {{port}}_vset_{{index}} ;
+{% endfor %}{% else %}real {{port}}_vset;
+{%endif%}{% elif portitem['dir'] in ['input','inout'] and portitem['supply_type'] in ['volts']%}
+{%- if portitem.msb %}{%for index in range(portitem['lsb']|int,portitem['msb']|int+1,1) %} real {{port}}_volts_{{index}} ;
+{% endfor %}{% else %}real {{port}}_volts;{%endif%}{%endif%}{% endfor %}
+{% for port,portitem in ports.items() %}
+{%- if portitem['dir'] in ['output'] and portitem['supply_type'] in ['volts']%}{%- if portitem.msb %}
+{%- for index in range(portitem['lsb']|int,portitem['msb']|int+1,1) %} integer {{port}}_enable_{{index}} ;
+{% endfor %}{% else %}integer {{port}}_enable;
+{%endif%}{%endif%}{% endfor %}
+// declarations for supply rout variables. (assuming all are voltages) - dont use array variable for easier plotting 
+{% for port,portitem in ports.items() %}{%if portitem['dir'] in ['output'] and portitem['supply_type'] in ['volts']%}{% if portitem.msb %}{%for index in range(portitem['lsb']|int,portitem['msb']|int+1,1) %} real {{port}}_roff_{{index}} = 10K;
+{% endfor %}{% else %}real {{port}}_roff = 10K;
+{%endif%}{%endif%}{% endfor %}
+{% for port,portitem in ports.items() %}{%if portitem['dir'] in ['output'] and portitem['supply_type'] in ['volts']%}{% if portitem.msb %}{%for index in range(portitem['lsb']|int,portitem['msb']|int+1,1) %} real {{port}}_ron_{{index}} = 10;
+{% endfor %}{% else %}real {{port}}_ron = 10;
+{%endif%}{%endif%}{% endfor %}
+// declarations for transition time
+{% for port,portitem in ports.items() %}{%if portitem['dir'] in ['output'] and portitem['supply_type'] in ['volts']%}{% if portitem.msb %}{%for index in range(portitem['lsb']|int,portitem['msb']|int+1,1) %} real {{port}}_tt_{{index}} = 1n;
+{% endfor %}{% else %}real {{port}}_tt = 1n;
+{%endif%}{%endif%}{% endfor %}
+
+// for the analog context
+// rratio 
+{% for port,portitem in ports.items() %}{%if portitem['dir'] in ['output'] and portitem['supply_type'] in ['volts']%}{% if portitem.msb %}{%for index in range(portitem['lsb']|int,portitem['msb']|int+1,1) %} real {{port}}_rratio_{{index}};
+{% endfor %}{% else %}real {{port}}_rratio;
+{%endif%}{%endif%}{% endfor %}
+// declarations for supply voltage variables. (assuming all are voltages)
+{% for port,portitem in ports.items() %}{%if portitem['dir'] in ['output'] and portitem['supply_type'] in ['volts']%}electrical {% if portitem.msb %}[{{portitem['msb']}}:{{portitem['lsb']}}]{%endif%}{{port}}_vdrive;
+{%endif%}{% endfor %}
+// declarations for supply rout variables. (assuming all are voltages)
+{% for port,portitem in ports.items() %}{%if portitem['dir'] in ['output'] and portitem['supply_type'] in ['volts']%}real {{port}}_rout{% if portitem.msb %}[{{portitem['msb']}}:{{portitem['lsb']}}]{%endif%};
+{%endif%}{% endfor %}
+always @(posedge sample_trigger) begin
+{% for port,portitem in ports.items() %}{% if portitem['dir'] in ['input','inout'] and portitem['supply_type'] in ['volts']%}{% if portitem.msb %}{%for index in range(portitem['lsb']|int,portitem['msb']|int+1,1) %}  {{port}}_volts_{{index}} <= V({{port}}[{{index}}]) ;
+{% endfor %}{% else %} {{port}}_volts <= V({{port}});
+{%endif%}{%endif%}{% endfor %}
+end
+
+analog begin
+{% for port,portitem in ports.items() %}{%if portitem['dir'] in ['output'] and portitem['supply_type'] in ['volts']%}{% if portitem.msb %}{%for index in range(portitem['lsb']|int,portitem['msb']|int+1,1) %}	{{port}}_rratio_{{index}} = transition({{port}}_ron_{{index}}/{{port}}_roff_{{index}},0,{{port}}_tt_{{index}},{{port}}_tt_{{index}});
+{% endfor %}{% else %}	{{port}}_rratio = transition({{port}}_ron/{{port}}_roff,0,{{port}}_tt,{{port}}_tt);
+{%endif%}{%endif%}{% endfor %}
+{% for port,portitem in ports.items() %}{%if portitem['dir'] in ['output'] and portitem['supply_type'] in ['volts']%}{% if portitem.msb %}{%for index in range(portitem['lsb']|int,portitem['msb']|int+1,1) %}	{{port}}_rout[{{index}}] = {{port}}_roff_{{index}}*pow({{port}}_rratio_{{index}},transition({{port}}_enable_{{index}}),0,{{port}}_tt_{{index}},{{port}}_tt_{{index}}) ;
+{% endfor %}{%else%}	{{port}}_rout = {{port}}_roff*pow( {{port}}_rratio, transition({{port}}_enable,0,{{port}}_tt,{{port}}_tt) );
+{%endif%}{%endif%}{% endfor %}
+{% for port,portitem in ports.items() %}{%if portitem['dir'] in ['output'] and portitem['supply_type'] in ['volts']%}{% if portitem.msb %}{%for index in range(portitem['lsb']|int,portitem['msb']|int+1,1) %}	V({{port}}_vdrive[{{index}}]) <+ transition({{port}}_vset_{{index}},0,{{port}}_tt_{{index}},{{port}}_tt_{{index}}) ;
+{% endfor %}{%else%}	V({{port}}_vdrive) <+ transition({{port}}_vset,0,{{port}}_tt,{{port}}_tt); 
+{%endif%}{%endif%}{% endfor %}
+{% for port,portitem in ports.items() %}{%if portitem['dir'] in ['output'] and portitem['supply_type'] in ['ground']%}{% if portitem.msb %}{%for index in range(portitem['lsb']|int,portitem['msb']|int+1,1) %}	V({{port}}[{{index}}]) <+ 0;
+{% endfor %}{% else %}	V({{port}}) <+ 0;
+{% endif %}{% else %}{% if portitem.msb %}{%for index in range(portitem['lsb']|int,portitem['msb']|int+1,1) %}	I({{port}}[{{index}}],{{port}}_vdrive[{{index}}]) <+ V({{port}}[{{index}}],{{port}}_vdrive[{{index}}])/{{port}}_rout[{{index}}];
+{% endfor %}{% else %}	I({{port}},{{port}}_vdrive) <+ V({{port}},{{port}}_vdrive)/{{port}}_rout;
+{% endif %}{% endif %}{%endfor%}
+end
+endmodule

@@ -1,0 +1,73 @@
+//Verilog-AMS HDL for "{{library_name}}", "{{name}}_adrive" "verilogams"
+
+`include "constants.vams"
+`include "disciplines.vams"
+// auto generated power top
+module {{ name }}_adrive ( {% set comma=joiner(', ') %}{% for port,portitem in ports.items()  %}{{ comma() }}
+	{{portitem['dir']}} {%if portitem['msb'] %}[{{portitem['msb']}}:{{portitem['lsb']}}]{%else%} 	{%endif%} 	{{port}} {% endfor %}
+);
+parameter real vmax =1.8;
+parameter real vcmpl = vmax -0.3;
+parameter real tt = 1n;
+// declarations for signals
+{% for port,portitem in ports.items() %}electrical{% if portitem.msb %}  [{{portitem[msb]}}:{{portitem[lsb]}}] {%else%} 	{%endif%} {{port}};
+{% endfor %}
+// variables for the digital context
+// declarations for voltage/current set variables. 
+{% for port,portitem in ports.items() %}{%if portitem['bias_type'] in ['current'] %}{% if portitem.msb %}{%for index in range(portitem['lsb']|int,portitem['msb']|int+1,1) %} real {{port}}_iset_{{index}}{% if portitem['ibias_nom'] %} = {{portitem['ibias_nom']}}{%endif%};
+{% endfor %}{% else %}real {{port}}_iset{% if portitem['ibias_nom'] %} = {{portitem['ibias_nom']}}{%endif%};
+{%endif%}{%else%}{% if portitem.msb %}{%for index in range(portitem['lsb']|int,portitem['msb']|int+1,1) %} real {{port}}_vset_{{index}} ;
+{% endfor %}{% else %}real {{port}}_vset;
+{%endif%}{%endif%}{% endfor %}
+// declaration for current gout variables.
+{% for port,portitem in ports.items() %}{%if portitem['bias_type'] in ['current']%}{% if portitem.msb %}{%for index in range(portitem['lsb']|int,portitem['msb']|int+1,1) %} real {{port}}_gset_{{index}} = 1M;
+{% endfor %}{% else %}real {{port}}_gset = 1M;
+{%endif%}{%endif%}{% endfor %}
+// declarations for voltage rout/ variables.  - dont use array variable for easier plotting 
+{% for port,portitem in ports.items() %}{%if portitem['bias_type'] in ['current']%}{%else%}{% if portitem.msb %}{%for index in range(portitem['lsb']|int,portitem['msb']|int+1,1) %} real {{port}}_roff_{{index}} = 10K;
+{% endfor %}{% else %}real {{port}}_roff = 10K;
+{%endif%}{%endif%}{% endfor %}
+{% for port,portitem in ports.items() %}{%if portitem['bias_type'] in ['current']%}{%else%}{% if portitem.msb %}{%for index in range(portitem['lsb']|int,portitem['msb']|int+1,1) %} real {{port}}_ron_{{index}} = 10;
+{% endfor %}{% else %}real {{port}}_ron = 10;
+{%endif%}{%endif%}{% endfor %}
+
+// for the analog context
+// iout
+{% for port,portitem in ports.items() %}{%if portitem['bias_type'] in ['current']%}{% if portitem.msb %}{%for index in range(portitem['lsb']|int,portitem['msb']|int+1,1) %} real {{port}}_iout_{{index}};
+{% endfor %}{% else %}real {{port}}_iout;
+{%endif%}{%endif%}{% endfor %}
+// rratio 
+{% for port,portitem in ports.items() %}{%if portitem['bias_type'] in ['current']-%}
+{%else%}{% if portitem.msb %}{%for index in range(portitem['lsb']|int,portitem['msb']|int+1,1) %} real {{port}}_rratio_{{index}};
+{% endfor %}{% else %}real {{port}}_rratio;
+{%endif%}{%endif%}{% endfor %}
+// declarations for supply voltage variables. (assuming all are voltages)
+{% for port,portitem in ports.items() %}{%if portitem['bias_type'] in ['current']%}{%else%}electrical {{port}}_vdrive{% if portitem.msb %}[{{portitem[msb]}}:{{portitem[lsb]}}]{%endif%};
+{%endif%}{% endfor %}
+// declarations for supply rout/gout variables. (assuming all are voltages)
+{% for port,portitem in ports.items() %}{%if portitem['bias_type'] in ['current']%}real {{port}}_gout{% if portitem.msb %}[{{portitem[msb]}}:{{portitem[lsb]}}]{%endif%};
+{%else%}real {{port}}_rout{% if portitem.msb %}[{{portitem[msb]}}:{{portitem[lsb]}}]{%endif%};
+{%endif%}{% endfor %}
+analog begin
+{% for port,portitem in ports.items() %}{%if portitem['bias_type'] in ['current']%}{%else%}{% if portitem.msb %}{%for index in range(portitem['lsb']|int,portitem['msb']|int+1,1) %}	{{port}}_rratio_{{index}} = transition({{port}}_ron_{{index}}/{{port}}_roff_{{index}},0,tt,tt);
+{% endfor %}{% else %}	{{port}}_rratio = transition({{port}}_ron/{{port}}_roff,0,tt,tt);
+{%endif%}{%endif%}{% endfor %}
+{% for port,portitem in ports.items() %}{%if portitem['bias_type'] in ['current']%}{% if portitem.msb %}{%for index in range(portitem['lsb']|int,portitem['msb']|int+1,1) %}	{{port}}_gout[{{index}}] = transition({{port}}_gset_{{index}},0,tt,tt) ;
+{% endfor %}{%else%}	{{port}}_gout = transition({{port}}_gset,0,tt,tt );
+{%endif%}{%else%}{% if portitem.msb %}{%for index in range(portitem['lsb']|int,portitem['msb']|int+1,1) %}	{{port}}_rout[{{index}}] = {{port}}_roff_{{index}}*pow({{port}}_rratio_{{index}},transition({{port}}_enable[{{index}}]),0,tt,tt) ;
+{% endfor %}{%else%}	{{port}}_rout = {{port}}_roff*pow( {{port}}_rratio, transition({{port}}_enable,0,tt,tt) );
+{%endif%}{%endif%}{% endfor %}
+{% for port,portitem in ports.items() %}{%if portitem['bias_type'] in ['current']%}{% if portitem.msb %}{%for index in range(portitem['lsb']|int,portitem['msb']|int+1,1) %}	{{port}}_iout_{{index}} = transition({{port}}_iset_{{index}},0,tt,tt) ;
+{% endfor %}{%else%}	{{port}}_iout = transition({{port}}_iset,0,tt,tt); 
+{%endif%}{%else%}{% if portitem.msb %}{%for index in range(portitem['lsb']|int,portitem['msb']|int+1,1) %}	V({{port}}_vdrive[{{index}}]) <+ transition({{port}}_vset_{{index}},0,tt,tt) ;
+{% endfor %}{%else%}	V({{port}}_vdrive) <+ transition({{port}}_vset,0,tt,tt); 
+{%endif%}{%endif%}{% endfor %}
+{% for port,portitem in ports.items() %}{%if portitem['bias_type'] in ['current']%}{% if portitem.msb %}{%for index in range(portitem['lsb']|int,portitem['msb']|int+1,1) %}	I({{port}}[{{index}}]) <+ {{port}}_gout[{{index}}]*V({{port}}[{{index}}]) 
+					- {{port}}_iout_{{index}} * 0.5 * (1.0+tanh(2.0*(vmax + vcmpl -V({{port}}[{{index}}]))/(vmax-vcmpl)));
+{% endfor %}{% else %}	I({{port}}) <+ {{port}}_gout*V({{port}}) 
+					- {{port}}_iout * 0.5 * (1.0+tanh(2.0*(vmax + vcmpl -V({{port}}))/(vmax-vcmpl)));
+{% endif %}{% else %}{% if portitem.msb %}{%for index in range(portitem['lsb']|int,portitem['msb']|int+1,1) %}	I({{port}}[{{index}}],{{port}}_vdrive[{{index}}]) <+ V({{port}}[{{index}}],{{port}}_vdrive[{{index}}])/{{port}}_rout[{{index}}];
+{% endfor %}{% else %}	I({{port}},{{port}}_vdrive) <+ V({{port}},{{port}}_vdrive)/{{port}}_rout;
+{% endif %}{% endif %}{%endfor%}
+end
+endmodule

@@ -1,0 +1,9 @@
+{{blocks['dut']['name']}}_stim_analog_adrive.sv
+{{blocks['dut']['name']}}_stim_analog.sv
+{{blocks['dut']['name']}}_stim_digital.sv
+{{blocks['dut']['name']}}_stim_register.sv
+{{blocks['dut']['name']}}_stim_power_adrive.sv
+{{blocks['dut']['name']}}_stim_power.sv
+{{blocks['dut']['name']}}_stim_bias_adrive.sv
+{{blocks['dut']['name']}}_stim_bias.sv
+{{name}}.sv
